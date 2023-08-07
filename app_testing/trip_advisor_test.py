@@ -306,7 +306,7 @@ class TripAdvisorTest:
 
             self.return_to_main_hotel_page()
 
-        prices_data["hotel_name"] = hotel_data
+        prices_data[self.hotel_name] = hotel_data
 
         self.save_to_json(prices_data)
         self.driver.quit()

@@ -291,3 +291,4 @@ gradlew
 gradlew.bat
 local.properties
 settings.gradle.kts
+appium.log/run_test.py
