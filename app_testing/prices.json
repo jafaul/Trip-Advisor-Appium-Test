@@ -2,18 +2,20 @@
   "The Grosvenor Hotel": {
     "1_09_2023-2_09_2023": {
       "Booking.com": 64,
-      "Priceline": 64,
       "Agoda.com": 64,
+      "Priceline": 64,
       "Vio.com": 64,
       "eDreams": 64,
+      "ZenHotels.com": 64,
       "screenshot": "screenshot_1_09_2023-2_09_2023.png"
     },
     "3_09_2023-4_09_2023": {
       "Booking.com": 53,
-      "Priceline": 53,
       "Agoda.com": 53,
+      "Priceline": 53,
       "Vio.com": 53,
       "eDreams": 53,
+      "ZenHotels.com": 53,
       "screenshot": "screenshot_3_09_2023-4_09_2023.png"
     },
     "10_09_2023-11_09_2023": {
@@ -26,8 +28,8 @@
     },
     "4_09_2023-5_09_2023": {
       "Booking.com": 64,
-      "Priceline": 64,
       "Agoda.com": 64,
+      "Priceline": 64,
       "Vio.com": 64,
       "eDreams": 64,
       "ZenHotels.com": 64,
@@ -36,7 +38,7 @@
     "28_09_2023-29_09_2023": {
       "Booking.com": 53,
       "Priceline": 53,
-      "Agoda.com": 53,
+      "Agoda.com": 64,
       "Vio.com": 53,
       "eDreams": 53,
       "screenshot": "screenshot_28_09_2023-29_09_2023.png"

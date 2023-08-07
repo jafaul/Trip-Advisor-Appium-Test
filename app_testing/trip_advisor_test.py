@@ -232,7 +232,7 @@ class TripAdvisorTest:
                     EC.element_to_be_clickable((AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnAllDeals"))
                 )
                 view_all_deals_button.click()
-                time.sleep(3)
+                time.sleep(4)
                 break
             except TimeoutException:
                 self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnReload").click()
