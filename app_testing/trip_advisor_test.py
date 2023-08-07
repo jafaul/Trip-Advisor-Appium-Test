@@ -1,7 +1,6 @@
 import json
 import os
 from typing import Optional
-from datetime import datetime
 
 from appium.webdriver import WebElement
 from appium.webdriver.appium_service import AppiumService
@@ -11,7 +10,11 @@ from appium import webdriver
 import time
 
 from appium.webdriver.common.touch_action import TouchAction
-from selenium.common import NoSuchElementException
+from selenium.common import NoSuchElementException, TimeoutException
+from selenium.webdriver import ActionChains
+from selenium.webdriver.common.actions import interaction
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
+from selenium.webdriver.common.actions.pointer_input import PointerInput
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
@@ -31,8 +34,7 @@ class TripAdvisorTest:
         self.driver = None
         self.input_dates = input_dates
         self.hotel_name = hotel_name
-        self.dates_to_search = []
-        self.format_dates()
+        self.dates_to_search = DateHelper.format_dates(input_dates=self.input_dates)
 
     def start_appium_service(self):
         self.appium_service = AppiumService()
@@ -45,8 +47,7 @@ class TripAdvisorTest:
             "deviceName": device_name,
             "appPackage": "com.tripadvisor.tripadvisor",
             "appActivity": "com.tripadvisor.android.ui.launcher.LauncherActivity",
-            'automationName': 'UiAutomator2',
-            "noReload": True
+            "automationName": "UiAutomator2"
         }
         try:
             appium_server_url = "http://localhost:4723"
@@ -99,11 +100,11 @@ class TripAdvisorTest:
         )
         get_dates_button.click()
 
-    def scroll_up(self):
+    def scroll_calendar_up(self):
         action = TouchAction(self.driver)
         action.press(x=500, y=1988).move_to(x=500, y=1266).release().perform()
 
-    def scroll_down(self):
+    def scroll_calendar_down(self):
         action = TouchAction(self.driver)
         action.press(x=300, y=1250).move_to(x=300, y=2000).release().perform()
 
@@ -135,47 +136,57 @@ class TripAdvisorTest:
         except NoSuchElementException:
             return None
 
-    def find_month_container_by_date(self, date_text):
-        container_id = 1
+    @staticmethod
+    def __find_date_element(month_container: WebElement, month_year: str) -> WebElement:
+        date_element = month_container.find_element(
+            AppiumBy.XPATH, f".//android.widget.TextView[@text='{month_year}']"
+        )
+        return date_element
+
+    def __find_month_container(self, container_id: int) -> Optional[WebElement]:
+        month_container = self.__find_element_or_none(
+            AppiumBy.XPATH,
+            f"(//android.view.ViewGroup[@resource-id='com.tripadvisor.tripadvisor:id/monthView'])[{container_id}]"
+        )
+        return month_container
+
+    def __find_current_month_container(self, container_id) -> None:
         current_month_year = DateHelper.get_current_month_and_year()
         while True:
-            current_month_container = self.__find_element_or_none(
-                AppiumBy.XPATH,
-                f"(//android.view.ViewGroup[@resource-id='com.tripadvisor.tripadvisor:id/monthView'])[{container_id}]"
-            )
+            current_month_container = self.__find_month_container(container_id=container_id)
             if current_month_container is None:
-                self.scroll_down()
+                print("Scrolled down -- current month container is not found")
+                self.scroll_calendar_down()
                 continue
             try:
-                date_element = current_month_container.find_element(
-                    AppiumBy.XPATH, f".//android.widget.TextView[@text='{current_month_year}']"
-                )
+                self.__find_date_element(month_container=current_month_container, month_year=current_month_year)
                 break
             except NoSuchElementException:
-                self.scroll_down()
+                print("Scrolled down -- current date element is not found in month container")
+                self.scroll_calendar_down()
                 time.sleep(4)
 
+    def find_month_container_by_date(self, month_year) -> WebElement:
+        container_id = 1
+        self.__find_current_month_container(container_id=container_id)
+
         while True:
-            month_container = self.__find_element_or_none(
-                AppiumBy.XPATH,
-                f"(//android.view.ViewGroup[@resource-id='com.tripadvisor.tripadvisor:id/monthView'])[{container_id}]"
-            )
+            month_container = self.__find_month_container(container_id=container_id)
             if month_container is None:
-                self.scroll_up()
+                print("Scrolled up -- month container is not found")
+                self.scroll_calendar_up()
                 time.sleep(2)
                 container_id += 1
-
             try:
-                date_element = month_container.find_element(
-                    AppiumBy.XPATH, f".//android.widget.TextView[@text='{date_text}']"
-                )
+                self.__find_date_element(month_container=month_container, month_year=month_year)
                 return month_container
             except NoSuchElementException:
-                self.scroll_up()
+                print("Scrolled up -- date element is not found in month container")
+                self.scroll_calendar_up()
                 time.sleep(2)
                 container_id += 1
 
-    def click_date(self, date_text, integer_text):
+    def click_date(self, date_text, integer_text) -> None:
         while True:
             month_container = self.find_month_container_by_date(date_text)
 
@@ -189,9 +200,10 @@ class TripAdvisorTest:
                 integer_element.click()
                 return
             else:
-                self.scroll_up()
+                print("scrolled up - integer_element is not found")
+                self.scroll_calendar_up()
 
-    def __check_input_dates(self, dates: list[tuple[str, str]]):
+    def __check_input_dates(self, dates: list[tuple[str, str]]) -> Optional[True]:
         if len(dates) != 2:
             self.driver.quit()
             self.appium_service.stop()
@@ -216,57 +228,71 @@ class TripAdvisorTest:
     def click_view_all_deals(self):
         while True:
             try:
-                time.sleep(10)
-                self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnAllDeals").click()
-                time.sleep(5)
+                view_all_deals_button = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnAllDeals"))
+                )
+                view_all_deals_button.click()
+                time.sleep(3)
                 break
-            except NoSuchElementException:
+            except TimeoutException:
                 self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnReload").click()
 
-    def get_prices_by_providers(self) -> dict[str, int | str]:
-        prices_by_provides = {}
+    def __scroll_deals_page_up(self):
+        actions = ActionChains(self.driver)
+        actions.w3c_actions = ActionBuilder(self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
+        actions.w3c_actions.pointer_action.move_to_location(516, 2084)
+        actions.w3c_actions.pointer_action.pointer_down()
+        actions.w3c_actions.pointer_action.move_to_location(516, 837)
+        actions.w3c_actions.pointer_action.release()
+        actions.perform()
+
+    def __get_top_deal(self) -> tuple[str, int]:
+        top_deal_provider = self.driver.find_element(
+            AppiumBy.ID, "com.tripadvisor.tripadvisor:id/imgProviderLogo"
+        )
+        top_deal_price_xpath = \
+            "(//androidx.recyclerview.widget.RecyclerView/androidx.cardview.widget.CardView)[1]//android.widget.TextView[contains(@resource-id, 'txtPriceTopDeal')]"
+        top_deal_price = WebDriverWait(self.driver, 30).until(
+            EC.visibility_of_element_located((AppiumBy.XPATH, top_deal_price_xpath))
+        )
+        return top_deal_provider.get_attribute("content-desc"), int(top_deal_price.text.replace("$", ""))
+
+    def __get_providers_and_prices(self) -> tuple[list[WebElement], list[WebElement]]:
         providers = self.driver.find_elements(
             AppiumBy.XPATH, "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtProviderName']"
         )
         prices = self.driver.find_elements(
             AppiumBy.XPATH, "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtPriceTopDeal']"
         )
-        top_deal_provider = self.driver.find_element(
-            AppiumBy.ID, "com.tripadvisor.tripadvisor:id/imgProviderLogo"
-        )
+        if len(providers) > len(prices):
+            delta = len(providers) - len(prices)
+            providers = providers[:-delta]
+        return providers, prices
 
-        top_deal_price_xpath = \
-            "(//androidx.recyclerview.widget.RecyclerView/androidx.cardview.widget.CardView)[1]//android.widget.TextView[contains(@resource-id, 'txtPriceTopDeal')]"
+    def __check_deals_page_if_is_finished(self) -> Optional[WebElement]:
+        try:
+            finish_element = self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/txtContent")
+            return finish_element
+        except NoSuchElementException:
+            return None
 
-        top_deal_price = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((AppiumBy.XPATH, top_deal_price_xpath))
-        )
-
-        prices_by_provides[top_deal_provider.get_attribute("content-desc")] = int(top_deal_price.text.replace("$", ""))
-
-        for provider, price in zip(providers, prices):
-            provider_name = provider.text
-            price = price.text
-            prices_by_provides[provider_name] = int(price.replace("$", ""))
-        return prices_by_provides
+    def get_prices_by_providers(self) -> dict[str, str | int]:
+        top_deal_provider, top_deal_price = self.__get_top_deal()
+        prices_by_providers = {top_deal_provider: top_deal_price}
+        while True:
+            providers, prices = self.__get_providers_and_prices()
+            for provider, price in zip(providers, prices):
+                print(f"{provider=}: {price=}")
+                prices_by_providers[provider.text] = int(price.text.replace("$", ""))
+            if self.__check_deals_page_if_is_finished():
+                return prices_by_providers
+            else:
+                self.__scroll_deals_page_up()
+                time.sleep(2)
 
     def return_to_main_hotel_page(self):
         self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/imgCircularBtnIcon").click()
         time.sleep(2)
-
-    def format_dates(self) -> list[list[tuple[str, str]]]:
-        for start_date, end_date in self.input_dates:
-            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
-            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
-
-            month = start_date_obj.strftime("%B %Y")
-
-            start_day = start_date_obj.strftime("%d").lstrip("0")
-            end_day = end_date_obj.strftime("%d").lstrip("0")
-
-            self.dates_to_search.append([(month, start_day), (month, end_day)])
-
-        return self.dates_to_search
 
     def save_screenshot(self, dates: str):
         screenshots_directory = "C:\\Users\\aooli\\PycharmProjects\\TestTaskAndroid\\app_testing\\screenshots"
@@ -285,7 +311,6 @@ class TripAdvisorTest:
             json.dump({self.hotel_name: data}, json_file, indent=2)
 
     def run_test(self):
-        prices_data = {}
         self.start_appium_service()
         self.start_driver()
         self.open_tripadvisor()
@@ -306,9 +331,7 @@ class TripAdvisorTest:
 
             self.return_to_main_hotel_page()
 
-        prices_data[self.hotel_name] = hotel_data
-
-        self.save_to_json(prices_data)
+        self.save_to_json(hotel_data)
         self.driver.quit()
         self.appium_service.stop()
 

@@ -3,6 +3,22 @@ from datetime import datetime
 
 class DateHelper:
     @staticmethod
+    def format_dates(input_dates: list[tuple[str, str]]) -> list[list[tuple[str, str]]]:
+        dates_to_search = []
+        for start_date, end_date in input_dates:
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+
+            month = start_date_obj.strftime("%B %Y")
+
+            start_day = start_date_obj.strftime("%d").lstrip("0")
+            end_day = end_date_obj.strftime("%d").lstrip("0")
+
+            dates_to_search.append([(month, start_day), (month, end_day)])
+
+        return dates_to_search
+
+    @staticmethod
     def get_current_month_and_year() -> str:
         now = datetime.now()
         month_name = now.strftime("%B")
