@@ -241,9 +241,9 @@ class TripAdvisorTest:
     def __scroll_deals_page_up(self):
         actions = ActionChains(self.driver)
         actions.w3c_actions = ActionBuilder(self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
-        actions.w3c_actions.pointer_action.move_to_location(516, 2084)
+        actions.w3c_actions.pointer_action.move_to_location(606, 2084)
         actions.w3c_actions.pointer_action.pointer_down()
-        actions.w3c_actions.pointer_action.move_to_location(516, 837)
+        actions.w3c_actions.pointer_action.move_to_location(606, 815)
         actions.w3c_actions.pointer_action.release()
         actions.perform()
 
