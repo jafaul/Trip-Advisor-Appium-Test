@@ -99,6 +99,7 @@ class TripAdvisorTest:
             EC.element_to_be_clickable((AppiumBy.ID, "com.tripadvisor.tripadvisor:id/txtDate"))
         )
         get_dates_button.click()
+        time.sleep(2)
 
     def scroll_calendar_up(self):
         action = TouchAction(self.driver)
@@ -164,7 +165,7 @@ class TripAdvisorTest:
             except NoSuchElementException:
                 print("Scrolled down -- current date element is not found in month container")
                 self.scroll_calendar_down()
-                time.sleep(4)
+                time.sleep(2)
 
     def find_month_container_by_date(self, month_year) -> WebElement:
         container_id = 1
@@ -203,7 +204,7 @@ class TripAdvisorTest:
                 print("scrolled up - integer_element is not found")
                 self.scroll_calendar_up()
 
-    def __check_input_dates(self, dates: list[tuple[str, str]]) -> Optional[True]:
+    def __check_input_dates(self, dates: list[tuple[str, str]]) -> Optional[bool]:
         if len(dates) != 2:
             self.driver.quit()
             self.appium_service.stop()
@@ -232,7 +233,7 @@ class TripAdvisorTest:
                     EC.element_to_be_clickable((AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnAllDeals"))
                 )
                 view_all_deals_button.click()
-                time.sleep(4)
+                time.sleep(5)
                 break
             except TimeoutException:
                 self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnReload").click()
@@ -263,7 +264,7 @@ class TripAdvisorTest:
         )
         prices = self.driver.find_elements(
             AppiumBy.XPATH, "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtPriceTopDeal']"
-        )
+        )[1:]
         if len(providers) > len(prices):
             delta = len(providers) - len(prices)
             providers = providers[:-delta]
@@ -282,7 +283,7 @@ class TripAdvisorTest:
         while True:
             providers, prices = self.__get_providers_and_prices()
             for provider, price in zip(providers, prices):
-                print(f"{provider=}: {price=}")
+                print(f"{provider.text=}: {price.text=}")
                 prices_by_providers[provider.text] = int(price.text.replace("$", ""))
             if self.__check_deals_page_if_is_finished():
                 return prices_by_providers
@@ -336,8 +337,11 @@ class TripAdvisorTest:
         self.appium_service.stop()
 
 
-def test_run():
+#
+# def test_run():
+#     test_scenario = TripAdvisorTest(hotel_name="The Grosvenor Hotel", input_dates=DATES)
+#     test_scenario.run_test()
+
+if __name__ == "__main__":
     test_scenario = TripAdvisorTest(hotel_name="The Grosvenor Hotel", input_dates=DATES)
     test_scenario.run_test()
-
-
