@@ -22,9 +22,8 @@ from app_testing.config import device_name
 from app_testing.date_helper import DateHelper
 
 DATES = [
-    ('2023-09-01', '2023-09-02'), ('2023-09-03', '2023-09-04'),
+    ('2023-09-27', '2023-09-28'), ('2023-09-01', '2023-09-02'), ('2023-09-03', '2023-09-04'),
     ('2023-09-10', '2023-09-11'), ('2023-09-04', '2023-09-05'),
-    ('2023-09-28', '2023-09-29')
 ]
 
 
@@ -59,11 +58,8 @@ class TripAdvisorTest:
             return e
         return self.driver
 
-    def set_up_web_driver_wait(self):
-        return WebDriverWait(self.driver, 30)
-
     def open_tripadvisor(self):
-        wait = self.set_up_web_driver_wait()
+        wait = WebDriverWait(self.driver, 30)
         try:
             self.driver.get("https://www.tripadvisor.com/")
         except Exception as e:
@@ -78,7 +74,16 @@ class TripAdvisorTest:
             pass
 
     def search_hotel(self):
-        wait = self.set_up_web_driver_wait()
+        wait = WebDriverWait(self.driver, 5)
+        try:
+            ok_button = wait.until(
+                EC.element_to_be_clickable((AppiumBy.ID, "android:id/button1"))
+            )
+            ok_button.click()
+        except TimeoutException:
+            pass
+
+        wait = WebDriverWait(self.driver, 30)
         hotel_button = wait.until(
             EC.element_to_be_clickable((AppiumBy.XPATH, "//android.widget.Button[@content-desc='Hotels']"))
         )
@@ -91,10 +96,13 @@ class TripAdvisorTest:
         hotel_name_elements = wait.until(EC.presence_of_all_elements_located(
             (AppiumBy.XPATH, f"//android.widget.TextView[@text='{self.hotel_name}']")
         ))
-        hotel_name_elements[1].click()
+        try:
+            hotel_name_elements[1].click()
+        except IndexError:
+            hotel_name_elements[0].click()
 
     def click_get_dates_button(self):
-        wait = self.set_up_web_driver_wait()
+        wait = WebDriverWait(self.driver, 30)
         get_dates_button = wait.until(
             EC.element_to_be_clickable((AppiumBy.ID, "com.tripadvisor.tripadvisor:id/txtDate"))
         )
@@ -120,7 +128,6 @@ class TripAdvisorTest:
                 return None
         try:
             element = self.driver.find_element(by, value)
-            time.sleep(5)
             return element
         except NoSuchElementException:
             return None
@@ -165,7 +172,7 @@ class TripAdvisorTest:
             except NoSuchElementException:
                 print("Scrolled down -- current date element is not found in month container")
                 self.scroll_calendar_down()
-                time.sleep(2)
+                time.sleep(1)
 
     def find_month_container_by_date(self, month_year) -> WebElement:
         container_id = 1
@@ -176,7 +183,7 @@ class TripAdvisorTest:
             if month_container is None:
                 print("Scrolled up -- month container is not found")
                 self.scroll_calendar_up()
-                time.sleep(2)
+                time.sleep(1)
                 container_id += 1
             try:
                 self.__find_date_element(month_container=month_container, month_year=month_year)
@@ -184,7 +191,7 @@ class TripAdvisorTest:
             except NoSuchElementException:
                 print("Scrolled up -- date element is not found in month container")
                 self.scroll_calendar_up()
-                time.sleep(2)
+                time.sleep(1)
                 container_id += 1
 
     def click_date(self, date_text, integer_text) -> None:
@@ -218,9 +225,9 @@ class TripAdvisorTest:
         departure_month_and_year, departure_day = dates[1]
 
         self.click_date(arrival_month_and_year, arrival_day)
-        time.sleep(3)
+        time.sleep(1)
         self.click_date(departure_month_and_year, departure_day)
-        time.sleep(3)
+        time.sleep(1)
 
     def click_apply(self):
         apply_button = self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnPrimary")
@@ -233,19 +240,34 @@ class TripAdvisorTest:
                     EC.element_to_be_clickable((AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnAllDeals"))
                 )
                 view_all_deals_button.click()
-                time.sleep(5)
+                time.sleep(6)
                 break
             except TimeoutException:
-                self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnReload").click()
+                try:
+                    reload_button = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((AppiumBy.ID, "com.tripadvisor.tripadvisor:id/btnReload"))
+                    )
+                    reload_button.click()
+                except TimeoutException:
+                    actions = ActionChains(self.driver)
+                    actions.w3c_actions = ActionBuilder(
+                        self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch")
+                    )
+                    actions.w3c_actions.pointer_action.move_to_location(588, 1817)
+                    actions.w3c_actions.pointer_action.pointer_down()
+                    actions.w3c_actions.pointer_action.move_to_location(588, 1389)
+                    actions.w3c_actions.pointer_action.release()
+                    actions.perform()
 
     def __scroll_deals_page_up(self):
         actions = ActionChains(self.driver)
         actions.w3c_actions = ActionBuilder(self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
-        actions.w3c_actions.pointer_action.move_to_location(606, 2084)
+        actions.w3c_actions.pointer_action.move_to_location(374, 1800)
         actions.w3c_actions.pointer_action.pointer_down()
-        actions.w3c_actions.pointer_action.move_to_location(606, 815)
+        actions.w3c_actions.pointer_action.move_to_location(414, 800)
         actions.w3c_actions.pointer_action.release()
         actions.perform()
+        time.sleep(3)
 
     def __get_top_deal(self) -> tuple[str, int]:
         top_deal_provider = self.driver.find_element(
@@ -253,53 +275,58 @@ class TripAdvisorTest:
         )
         top_deal_price_xpath = \
             "(//androidx.recyclerview.widget.RecyclerView/androidx.cardview.widget.CardView)[1]//android.widget.TextView[contains(@resource-id, 'txtPriceTopDeal')]"
-        top_deal_price = WebDriverWait(self.driver, 30).until(
-            EC.visibility_of_element_located((AppiumBy.XPATH, top_deal_price_xpath))
-        )
+        top_deal_price = self.driver.find_element(AppiumBy.XPATH, top_deal_price_xpath)
         return top_deal_provider.get_attribute("content-desc"), int(top_deal_price.text.replace("$", ""))
 
     def __get_providers_and_prices(self) -> tuple[list[WebElement], list[WebElement]]:
         providers = self.driver.find_elements(
             AppiumBy.XPATH, "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtProviderName']"
         )
-        prices = self.driver.find_elements(
-            AppiumBy.XPATH, "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtPriceTopDeal']"
-        )[1:]
-        if len(providers) > len(prices):
-            delta = len(providers) - len(prices)
-            providers = providers[:-delta]
+        prices_xpath = "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtPriceTopDeal']"
+        prices = self.driver.find_elements(AppiumBy.XPATH, prices_xpath)
         return providers, prices
 
-    def __check_deals_page_if_is_finished(self) -> Optional[WebElement]:
+    def __check_deals_page_if_is_finished(self) -> Optional[bool]:
         try:
-            finish_element = self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/txtContent")
-            return finish_element
+            self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/txtContent")
+            return True
         except NoSuchElementException:
             return None
 
     def get_prices_by_providers(self) -> dict[str, str | int]:
         top_deal_provider, top_deal_price = self.__get_top_deal()
         prices_by_providers = {top_deal_provider: top_deal_price}
+        providers_from_single_page, prices_from_single_page = self.__get_providers_and_prices()
+        prices_from_single_page = prices_from_single_page[1:]
+        prices = []
         while True:
-            providers, prices = self.__get_providers_and_prices()
-            for provider, price in zip(providers, prices):
-                print(f"{provider.text=}: {price.text=}")
-                prices_by_providers[provider.text] = int(price.text.replace("$", ""))
+            for provider, price in zip(providers_from_single_page, prices_from_single_page):
+                price: WebElement
+                if price not in prices:
+                    prices_by_providers[provider.text] = int(price.text.replace("$", ""))
+                    prices.append(price)
             if self.__check_deals_page_if_is_finished():
                 return prices_by_providers
             else:
                 self.__scroll_deals_page_up()
-                time.sleep(2)
+                providers_from_single_page, prices_from_single_page = self.__get_providers_and_prices()
+                if len(providers_from_single_page) > len(prices_from_single_page):
+                    delta = len(providers_from_single_page) - len(prices_from_single_page)
+                    providers_from_single_page = providers_from_single_page[:-delta]
 
     def return_to_main_hotel_page(self):
         self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/imgCircularBtnIcon").click()
         time.sleep(2)
 
-    def save_screenshot(self, dates: str):
-        screenshots_directory = "C:\\Users\\aooli\\PycharmProjects\\TestTaskAndroid\\app_testing\\screenshots"
-
+    def __create_screenshot_name(self, dates: str) -> str:
         activity_name = self.driver.current_activity
-        filename = activity_name + dates + ".png"
+        return activity_name + dates + ".png"
+
+    def save_screenshot(self, dates: str):
+        script_directory = os.path.dirname(os.path.abspath(__file__))
+        screenshots_directory = os.path.join(script_directory, "screenshots")
+
+        filename = self.__create_screenshot_name(dates)
 
         if not os.path.exists(screenshots_directory):
             os.makedirs(screenshots_directory)
@@ -324,7 +351,7 @@ class TripAdvisorTest:
             self.click_apply()
             self.click_view_all_deals()
             output_dates = DateHelper.get_output_dates(date)
-            screenshot_name = f"screenshot_{output_dates}.png"
+            screenshot_name = self.__create_screenshot_name(output_dates)
             self.save_screenshot(screenshot_name)
             prices_by_provider = self.get_prices_by_providers()
             prices_by_provider["screenshot"] = screenshot_name
@@ -337,11 +364,6 @@ class TripAdvisorTest:
         self.appium_service.stop()
 
 
-#
-# def test_run():
-#     test_scenario = TripAdvisorTest(hotel_name="The Grosvenor Hotel", input_dates=DATES)
-#     test_scenario.run_test()
-
-if __name__ == "__main__":
+def test_run():
     test_scenario = TripAdvisorTest(hotel_name="The Grosvenor Hotel", input_dates=DATES)
     test_scenario.run_test()

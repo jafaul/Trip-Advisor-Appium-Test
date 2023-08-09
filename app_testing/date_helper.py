@@ -30,7 +30,7 @@ class DateHelper:
         row_arrival_month_and_year, arrival_day = dates[0]
         row_departure_month_and_year, departure_day = dates[1]
 
-        def get_month_number(month):
+        def get_month_number(month: str) -> str:
             return datetime.strptime(month, "%B").strftime("%m")
 
         arrival_month_and_year = row_arrival_month_and_year.split(' ')
