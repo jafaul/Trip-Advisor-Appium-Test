@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import Optional
 
 from appium.webdriver import WebElement
@@ -9,7 +10,6 @@ from appium import webdriver
 
 import time
 
-from appium.webdriver.common.touch_action import TouchAction
 from selenium.common import NoSuchElementException, TimeoutException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.actions import interaction
@@ -22,8 +22,8 @@ from app_testing.config import device_name
 from app_testing.date_helper import DateHelper
 
 DATES = [
-    ('2023-09-27', '2023-09-28'), ('2023-09-01', '2023-09-02'), ('2023-09-03', '2023-09-04'),
-    ('2023-09-10', '2023-09-11'), ('2023-09-04', '2023-09-05'),
+    ('2023-12-31', '2024-01-01'), ('2023-09-27', '2023-09-28'), ('2023-10-28', '2023-10-29'),
+    ('2023-11-10', '2023-11-11'), ('2023-12-24', '2023-12-25'),
 ]
 
 
@@ -110,12 +110,22 @@ class TripAdvisorTest:
         time.sleep(2)
 
     def scroll_calendar_up(self):
-        action = TouchAction(self.driver)
-        action.press(x=500, y=1988).move_to(x=500, y=1266).release().perform()
+        actions = ActionChains(self.driver)
+        actions.w3c_actions = ActionBuilder(self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
+        actions.w3c_actions.pointer_action.move_to_location(341, 1600)
+        actions.w3c_actions.pointer_action.pointer_down()
+        actions.w3c_actions.pointer_action.move_to_location(341, 1250)
+        actions.w3c_actions.pointer_action.release()
+        actions.perform()
 
     def scroll_calendar_down(self):
-        action = TouchAction(self.driver)
-        action.press(x=300, y=1250).move_to(x=300, y=2000).release().perform()
+        actions = ActionChains(self.driver)
+        actions.w3c_actions = ActionBuilder(self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
+        actions.w3c_actions.pointer_action.move_to_location(449, 1250)
+        actions.w3c_actions.pointer_action.pointer_down()
+        actions.w3c_actions.pointer_action.move_to_location(449, 1600)
+        actions.w3c_actions.pointer_action.release()
+        actions.perform()
 
     def __find_element_or_none(
             self, by, value, parent_element: Optional[WebElement] = None) -> Optional[WebElement]:
@@ -144,60 +154,57 @@ class TripAdvisorTest:
         except NoSuchElementException:
             return None
 
-    @staticmethod
-    def __find_date_element(month_container: WebElement, month_year: str) -> WebElement:
-        date_element = month_container.find_element(
-            AppiumBy.XPATH, f".//android.widget.TextView[@text='{month_year}']"
-        )
-        return date_element
-
-    def __find_month_container(self, container_id: int) -> Optional[WebElement]:
-        month_container = self.__find_element_or_none(
+    def __find_month_container(self) -> Optional[list[WebElement]]:
+        month_container = self.__find_elements_or_none(
             AppiumBy.XPATH,
-            f"(//android.view.ViewGroup[@resource-id='com.tripadvisor.tripadvisor:id/monthView'])[{container_id}]"
+            f"(//android.view.ViewGroup[@resource-id='com.tripadvisor.tripadvisor:id/monthView'])"
         )
         return month_container
 
-    def __find_current_month_container(self, container_id) -> None:
-        current_month_year = DateHelper.get_current_month_and_year()
-        while True:
-            current_month_container = self.__find_month_container(container_id=container_id)
-            if current_month_container is None:
-                print("Scrolled down -- current month container is not found")
-                self.scroll_calendar_down()
-                continue
-            try:
-                self.__find_date_element(month_container=current_month_container, month_year=current_month_year)
-                break
-            except NoSuchElementException:
-                print("Scrolled down -- current date element is not found in month container")
-                self.scroll_calendar_down()
-                time.sleep(1)
+    @staticmethod
+    def find_date_element(month_container: WebElement) -> Optional[str]:
+        month_year_element = month_container.find_element(
+            AppiumBy.XPATH, ".//android.widget.TextView"
+        )
+        text = month_year_element.get_attribute("text")
+
+        match = re.search(r'(\w+\s+\d{3,})', text)
+        if match:
+            month_year = match.group(1)
+            return month_year
+
+        return None
 
     def find_month_container_by_date(self, month_year) -> WebElement:
-        container_id = 1
-        self.__find_current_month_container(container_id=container_id)
-
         while True:
-            month_container = self.__find_month_container(container_id=container_id)
-            if month_container is None:
-                print("Scrolled up -- month container is not found")
-                self.scroll_calendar_up()
-                time.sleep(1)
-                container_id += 1
-            try:
-                self.__find_date_element(month_container=month_container, month_year=month_year)
-                return month_container
-            except NoSuchElementException:
-                print("Scrolled up -- date element is not found in month container")
-                self.scroll_calendar_up()
-                time.sleep(1)
-                container_id += 1
+            current_month_container = self.__find_month_container()
+            month_container_index = 0
+            current_calendar_position = self.find_date_element(
+                month_container=current_month_container[month_container_index]
+            )
+            if current_calendar_position is None:
+                month_container_index += 1
+                current_calendar_position = self.find_date_element(
+                    month_container=current_month_container[month_container_index]
+                )
 
-    def click_date(self, date_text, integer_text) -> None:
+            is_calendar_position_before_or_after = DateHelper.is_current_calendar_position_before_or_after_desired(
+                current_calendar_position=current_calendar_position, desired_calendar_position=month_year
+            )
+            if is_calendar_position_before_or_after == "before":
+                self.scroll_calendar_up()
+                time.sleep(2)
+                continue
+            elif is_calendar_position_before_or_after == "after":
+                self.scroll_calendar_down()
+                time.sleep(2)
+                continue
+            elif is_calendar_position_before_or_after is False and month_year == current_calendar_position:
+                return current_month_container[month_container_index]
+
+    def click_date(self, month_year, integer_text) -> None:
+        month_container = self.find_month_container_by_date(month_year)
         while True:
-            month_container = self.find_month_container_by_date(date_text)
-
             integer_element = self.__find_element_or_none(
                 AppiumBy.XPATH,
                 f".//android.widget.TextView[@text='{integer_text}']",
@@ -208,8 +215,8 @@ class TripAdvisorTest:
                 integer_element.click()
                 return
             else:
-                print("scrolled up - integer_element is not found")
                 self.scroll_calendar_up()
+                time.sleep(2)
 
     def __check_input_dates(self, dates: list[tuple[str, str]]) -> Optional[bool]:
         if len(dates) != 2:
@@ -270,20 +277,28 @@ class TripAdvisorTest:
         time.sleep(3)
 
     def __get_top_deal(self) -> tuple[str, int]:
-        top_deal_provider = self.driver.find_element(
-            AppiumBy.ID, "com.tripadvisor.tripadvisor:id/imgProviderLogo"
+        top_deal_provider_locator = (AppiumBy.ID, "com.tripadvisor.tripadvisor:id/imgProviderLogo")
+        top_deal_price_locator = (
+            AppiumBy.XPATH,
+            "(//androidx.recyclerview.widget.RecyclerView/androidx.cardview.widget.CardView)[1]//android.widget.TextView[contains(@resource-id, 'txtPriceTopDeal')]",
         )
-        top_deal_price_xpath = \
-            "(//androidx.recyclerview.widget.RecyclerView/androidx.cardview.widget.CardView)[1]//android.widget.TextView[contains(@resource-id, 'txtPriceTopDeal')]"
-        top_deal_price = self.driver.find_element(AppiumBy.XPATH, top_deal_price_xpath)
+
+        WebDriverWait(self.driver, 20).until(EC.presence_of_element_located(top_deal_provider_locator))
+        top_deal_provider = self.driver.find_element(*top_deal_provider_locator)
+
+        WebDriverWait(self.driver, 20).until(EC.presence_of_element_located(top_deal_price_locator))
+        top_deal_price = self.driver.find_element(*top_deal_price_locator)
+
         return top_deal_provider.get_attribute("content-desc"), int(top_deal_price.text.replace("$", ""))
 
     def __get_providers_and_prices(self) -> tuple[list[WebElement], list[WebElement]]:
         providers = self.driver.find_elements(
             AppiumBy.XPATH, "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtProviderName']"
         )
-        prices_xpath = "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtPriceTopDeal']"
-        prices = self.driver.find_elements(AppiumBy.XPATH, prices_xpath)
+        prices = self.driver.find_elements(
+            AppiumBy.XPATH,
+            "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtPriceTopDeal']"
+        )
         return providers, prices
 
     def __check_deals_page_if_is_finished(self) -> Optional[bool]:
@@ -300,11 +315,13 @@ class TripAdvisorTest:
         prices_from_single_page = prices_from_single_page[1:]
         prices = []
         while True:
+
             for provider, price in zip(providers_from_single_page, prices_from_single_page):
                 price: WebElement
                 if price not in prices:
                     prices_by_providers[provider.text] = int(price.text.replace("$", ""))
                     prices.append(price)
+
             if self.__check_deals_page_if_is_finished():
                 return prices_by_providers
             else:
