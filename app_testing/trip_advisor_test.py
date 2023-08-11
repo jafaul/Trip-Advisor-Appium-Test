@@ -335,7 +335,6 @@ class TripAdvisorTest:
 
     def return_to_main_hotel_page(self):
         self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/imgCircularBtnIcon").click()
-        time.sleep(2)
 
     def __create_screenshot_name(self, dates: str) -> str:
         activity_name = self.driver.current_activity
