@@ -19,12 +19,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 from app_testing.config import device_name
+from app_testing.date_calculator import DateCalculator
+from app_testing.date_formatter import DateFormatter
 from app_testing.date_helper import DateHelper
-
-DATES = [
-    ('2023-12-31', '2024-01-01'), ('2023-09-27', '2023-09-28'), ('2023-10-28', '2023-10-29'),
-    ('2023-11-10', '2023-11-11'), ('2023-12-24', '2023-12-25'),
-]
 
 
 class TripAdvisorTest:
@@ -33,7 +30,7 @@ class TripAdvisorTest:
         self.driver = None
         self.input_dates = input_dates
         self.hotel_name = hotel_name
-        self.dates_to_search = DateHelper.format_dates(input_dates=self.input_dates)
+        self.dates_to_search = DateFormatter.format_dates(input_dates=self.input_dates)
 
     def start_appium_service(self):
         self.appium_service = AppiumService()
@@ -109,7 +106,7 @@ class TripAdvisorTest:
         get_dates_button.click()
         time.sleep(2)
 
-    def scroll_calendar_up(self):
+    def __scroll_calendar_up(self):
         actions = ActionChains(self.driver)
         actions.w3c_actions = ActionBuilder(self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
         actions.w3c_actions.pointer_action.move_to_location(341, 1600)
@@ -118,7 +115,7 @@ class TripAdvisorTest:
         actions.w3c_actions.pointer_action.release()
         actions.perform()
 
-    def scroll_calendar_down(self):
+    def __scroll_calendar_down(self):
         actions = ActionChains(self.driver)
         actions.w3c_actions = ActionBuilder(self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "touch"))
         actions.w3c_actions.pointer_action.move_to_location(449, 1250)
@@ -154,6 +151,7 @@ class TripAdvisorTest:
         except NoSuchElementException:
             return None
 
+    @property
     def __find_month_container(self) -> Optional[list[WebElement]]:
         month_container = self.__find_elements_or_none(
             AppiumBy.XPATH,
@@ -175,9 +173,10 @@ class TripAdvisorTest:
 
         return None
 
-    def find_month_container_by_date(self, month_year) -> WebElement:
+    def __find_month_container_by_date(self, month_year) -> WebElement:
         while True:
-            current_month_container = self.__find_month_container()
+
+            current_month_container = self.__find_month_container
             month_container_index = 0
             current_calendar_position = self.find_date_element(
                 month_container=current_month_container[month_container_index]
@@ -188,22 +187,22 @@ class TripAdvisorTest:
                     month_container=current_month_container[month_container_index]
                 )
 
-            is_calendar_position_before_or_after = DateHelper.is_current_calendar_position_before_or_after_desired(
+            is_calendar_position_before_or_after = DateCalculator.is_current_calendar_position_before_or_after_desired(
                 current_calendar_position=current_calendar_position, desired_calendar_position=month_year
             )
             if is_calendar_position_before_or_after == "before":
-                self.scroll_calendar_up()
+                self.__scroll_calendar_up()
                 time.sleep(2)
                 continue
             elif is_calendar_position_before_or_after == "after":
-                self.scroll_calendar_down()
+                self.__scroll_calendar_down()
                 time.sleep(2)
                 continue
             elif is_calendar_position_before_or_after is False and month_year == current_calendar_position:
                 return current_month_container[month_container_index]
 
     def click_date(self, month_year, integer_text) -> None:
-        month_container = self.find_month_container_by_date(month_year)
+        month_container = self.__find_month_container_by_date(month_year)
         while True:
             integer_element = self.__find_element_or_none(
                 AppiumBy.XPATH,
@@ -215,7 +214,7 @@ class TripAdvisorTest:
                 integer_element.click()
                 return
             else:
-                self.scroll_calendar_up()
+                self.__scroll_calendar_up()
                 time.sleep(2)
 
     def __check_input_dates(self, dates: list[tuple[str, str]]) -> Optional[bool]:
@@ -280,7 +279,7 @@ class TripAdvisorTest:
         top_deal_provider_locator = (AppiumBy.ID, "com.tripadvisor.tripadvisor:id/imgProviderLogo")
         top_deal_price_locator = (
             AppiumBy.XPATH,
-            "(//androidx.recyclerview.widget.RecyclerView/androidx.cardview.widget.CardView)[1]//android.widget.TextView[contains(@resource-id, 'txtPriceTopDeal')]",
+            f"(//androidx.recyclerview.widget.RecyclerView/androidx.cardview.widget.CardView)[1]//android.widget.TextView[contains(@resource-id, 'txtPriceTopDeal')]",
         )
 
         WebDriverWait(self.driver, 20).until(EC.presence_of_element_located(top_deal_provider_locator))
@@ -291,6 +290,7 @@ class TripAdvisorTest:
 
         return top_deal_provider.get_attribute("content-desc"), int(top_deal_price.text.replace("$", ""))
 
+    @property
     def __get_providers_and_prices(self) -> tuple[list[WebElement], list[WebElement]]:
         providers = self.driver.find_elements(
             AppiumBy.XPATH, "//android.widget.TextView[@resource-id='com.tripadvisor.tripadvisor:id/txtProviderName']"
@@ -301,6 +301,7 @@ class TripAdvisorTest:
         )
         return providers, prices
 
+    @property
     def __check_deals_page_if_is_finished(self) -> Optional[bool]:
         try:
             self.driver.find_element(AppiumBy.ID, "com.tripadvisor.tripadvisor:id/txtContent")
@@ -308,10 +309,11 @@ class TripAdvisorTest:
         except NoSuchElementException:
             return None
 
+    @property
     def get_prices_by_providers(self) -> dict[str, str | int]:
         top_deal_provider, top_deal_price = self.__get_top_deal()
         prices_by_providers = {top_deal_provider: top_deal_price}
-        providers_from_single_page, prices_from_single_page = self.__get_providers_and_prices()
+        providers_from_single_page, prices_from_single_page = self.__get_providers_and_prices
         prices_from_single_page = prices_from_single_page[1:]
         prices = []
         while True:
@@ -322,11 +324,11 @@ class TripAdvisorTest:
                     prices_by_providers[provider.text] = int(price.text.replace("$", ""))
                     prices.append(price)
 
-            if self.__check_deals_page_if_is_finished():
+            if self.__check_deals_page_if_is_finished:
                 return prices_by_providers
             else:
                 self.__scroll_deals_page_up()
-                providers_from_single_page, prices_from_single_page = self.__get_providers_and_prices()
+                providers_from_single_page, prices_from_single_page = self.__get_providers_and_prices
                 if len(providers_from_single_page) > len(prices_from_single_page):
                     delta = len(providers_from_single_page) - len(prices_from_single_page)
                     providers_from_single_page = providers_from_single_page[:-delta]
@@ -370,7 +372,7 @@ class TripAdvisorTest:
             output_dates = DateHelper.get_output_dates(date)
             screenshot_name = self.__create_screenshot_name(output_dates)
             self.save_screenshot(screenshot_name)
-            prices_by_provider = self.get_prices_by_providers()
+            prices_by_provider = self.get_prices_by_providers
             prices_by_provider["screenshot"] = screenshot_name
             hotel_data[output_dates] = prices_by_provider
 
@@ -379,8 +381,3 @@ class TripAdvisorTest:
         self.save_to_json(hotel_data)
         self.driver.quit()
         self.appium_service.stop()
-
-
-def test_run():
-    test_scenario = TripAdvisorTest(hotel_name="The Grosvenor Hotel", input_dates=DATES)
-    test_scenario.run_test()
